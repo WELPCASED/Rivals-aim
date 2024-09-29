@@ -1,0 +1,214 @@
+-- Create the main ScreenGui in CoreGui
+local mainScreenGui = Instance.new("ScreenGui")
+mainScreenGui.Name = "CircleGui"
+mainScreenGui.ResetOnSpawn = false
+mainScreenGui.Parent = game:GetService("CoreGui")
+
+-- Create the green circle
+local circle = Instance.new("Frame")
+circle.Parent = mainScreenGui
+circle.AnchorPoint = Vector2.new(0.5, 0.5)
+circle.Position = UDim2.new(0.5, 0, 0.5, 0)
+circle.Size = UDim2.new(0, 150, 0, 150)
+circle.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+circle.BackgroundTransparency = 0.2
+circle.BorderSizePixel = 0
+
+-- Make the frame circular
+local uicorner = Instance.new("UICorner")
+uicorner.CornerRadius = UDim.new(1, 0)
+uicorner.Parent = circle
+
+-- Create a text box for player selection
+local textBox = Instance.new("TextBox")
+textBox.Parent = mainScreenGui
+textBox.Position = UDim2.new(0.5, -150, 0.1, 0)
+textBox.Size = UDim2.new(0, 150, 0, 50)
+textBox.PlaceholderText = "Type to search..."
+textBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+textBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+textBox.ClearTextOnFocus = false
+
+-- Create the "Target Nearest Player" button
+local targetButton = Instance.new("TextButton")
+targetButton.Parent = mainScreenGui
+targetButton.Position = UDim2.new(0.5, 10, 0.1, 0)
+targetButton.Size = UDim2.new(0, 150, 0, 50)
+targetButton.Text = "Target Nearest Player"
+targetButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+targetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Create the On/Off toggle button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Parent = mainScreenGui
+toggleButton.Position = UDim2.new(0.5, 170, 0.1, 0)
+toggleButton.Size = UDim2.new(0, 150, 0, 50)
+toggleButton.Text = "ON"
+toggleButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Create a scrolling frame for player list
+local playerListFrame = Instance.new("ScrollingFrame")
+playerListFrame.Parent = mainScreenGui
+playerListFrame.Position = UDim2.new(0.5, -100, 0.2, 0)
+playerListFrame.Size = UDim2.new(0, 200, 0, 200)
+playerListFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+playerListFrame.ScrollBarThickness = 10
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Parent = playerListFrame
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 5)
+
+local selectedPlayer = nil
+local isToggleOn = true
+
+-- Function to update the player list based on text box input
+local function updatePlayerList()
+    for _, v in pairs(playerListFrame:GetChildren()) do
+        if v:IsA("TextButton") then
+            v:Destroy()
+        end
+    end
+    
+    local players = game:GetService("Players")
+    local searchText = textBox.Text:lower()
+    
+    for _, player in pairs(players:GetPlayers()) do
+        if player.Name:lower():find(searchText) then
+            local button = Instance.new("TextButton")
+            button.Parent = playerListFrame
+            button.Size = UDim2.new(1, 0, 0, 50)
+            button.Text = player.Name
+            button.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+            button.TextColor3 = Color3.fromRGB(0, 0, 0)
+
+            button.MouseButton1Click:Connect(function()
+                textBox.Text = player.Name
+                playerListFrame.Visible = false
+                selectedPlayer = player
+            end)
+        end
+    end
+    
+    playerListFrame.CanvasSize = UDim2.new(0, 0, 0, #playerListFrame:GetChildren() * 55)
+end
+
+textBox:GetPropertyChangedSignal("Text"):Connect(function()
+    playerListFrame.Visible = true
+    updatePlayerList()
+end)
+
+-- Function to lock camera on a specific player
+local function lockCameraOnPlayer(player)
+    local camera = game.Workspace.CurrentCamera
+    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        camera.CFrame = CFrame.new(camera.CFrame.Position, player.Character.HumanoidRootPart.Position)
+    end
+end
+
+-- Continuously update the camera to lock on the selected player
+game:GetService("RunService").RenderStepped:Connect(function()
+    if isToggleOn then
+        if selectedPlayer then
+            lockCameraOnPlayer(selectedPlayer)
+        else
+            local nearestPlayer = getNearestPlayer()
+            lockCameraOnPlayer(nearestPlayer)
+        end
+    end
+end)
+
+-- Function to find the nearest player
+local function getNearestPlayer()
+    local players = game:GetService("Players")
+    local localPlayer = players.LocalPlayer
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestPlayer = player
+            end
+        end
+    end
+    
+    return nearestPlayer
+end
+
+-- Functionality for "Target Nearest Player" button
+targetButton.MouseButton1Click:Connect(function()
+    if isToggleOn then
+        local nearestPlayer = getNearestPlayer()
+        if nearestPlayer then
+            textBox.Text = nearestPlayer.Name
+            selectedPlayer = nearestPlayer
+        end
+    end
+end)
+
+-- Toggle functionality
+toggleButton.MouseButton1Click:Connect(function()
+    isToggleOn = not isToggleOn
+    toggleButton.Text = isToggleOn and "ON" or "OFF"
+    toggleButton.BackgroundColor3 = isToggleOn and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+end)
+
+-- Create a separate ScreenGui for the toggle button
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "ToggleGui"
+toggleGui.Parent = game:GetService("CoreGui")
+
+-- Create a frame for the Close/Open button
+local frame = Instance.new("Frame")
+frame.Parent = toggleGui
+frame.Position = UDim2.new(0, 0, 0.45, -30) -- Original position
+frame.Size = UDim2.new(0, 160, 0, 60) -- Adjusted for equal padding
+frame.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+frame.BorderSizePixel = 0
+
+-- Create the toggle button to close/open the main GUI
+local guiToggleButton = Instance.new("TextButton")
+guiToggleButton.Parent = frame
+guiToggleButton.Position = UDim2.new(0.5, -60, 0.5, -20) -- Centered inside the frame
+guiToggleButton.Size = UDim2.new(0, 120, 0, 40) -- Normal size
+guiToggleButton.Text = "Close" -- Initial text
+guiToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+guiToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Functionality for dragging the frame
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+local function updateInput(input)
+    if dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+
+frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(updateInput)
+
+-- Toggle main GUI visibility
+guiToggleButton.MouseButton1Click:Connect(function()
+    mainScreenGui.Enabled = not mainScreenGui.Enabled
+    guiToggleButton.Text = mainScreenGui.Enabled and "Close" or "Open"
+end)
